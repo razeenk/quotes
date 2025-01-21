@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quotes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Quotes</h1>
+  <div id="quotesContainer"></div>
+
+  <script>
+    async function loadQuotes() {
+      const response = await fetch("http://localhost:5000/api/quotes");
+      const quotes = await response.json();
+
+      const quotesContainer = document.getElementById("quotesContainer");
+      quotesContainer.innerHTML = ""; // Clear any previous content
+
+      quotes.forEach((quote) => {
+        const quoteDiv = document.createElement("div");
+        quoteDiv.className = "quote";
+
+        quoteDiv.innerHTML = `
+          <p><strong>${quote.text}</strong></p>
+          <p>- <a href="${quote.authorLink}" target="_blank">${quote.author}</a></p>
+        `;
+        quotesContainer.appendChild(quoteDiv);
+      });
+    }
+
+    loadQuotes();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+/* Common Styles */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f4f4f9;
+}
+
+h1 {
+  color: #333;
+}
+
+/* Quotes Page */
+#quotesContainer {
+  margin-top: 20px;
+}
+
+.quote {
+  background: #fff;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin: 10px 0;
+}
+
+.quote p {
+  margin: 5px 0;
+}
+
+.quote a {
+  color: #007BFF;
+  text-decoration: none;
+}
+
+.quote a:hover {
+  text-decoration: underline;
+}

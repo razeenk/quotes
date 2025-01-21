@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  <form id="quoteForm">
+    <input type="text" id="text" placeholder="Quote Text" required>
+    <input type="text" id="author" placeholder="Author Name" required>
+    <input type="url" id="authorLink" placeholder="Author Link" required>
+    <button type="submit">Add Quote</button>
+  </form>
+  <ul id="quoteList"></ul>
+
+  <script>
+    const form = document.getElementById("quoteForm");
+    const quoteList = document.getElementById("quoteList");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = document.getElementById("text").value;
+      const author = document.getElementById("author").value;
+      const authorLink = document.getElementById("authorLink").value;
+
+      await fetch("http://localhost:5000/admin/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, author, authorLink }),
+      });
+
+      alert("Quote added!");
+      form.reset();
+      loadQuotes();
+    });
+
+    async function loadQuotes() {
+      const response = await fetch("http://localhost:5000/admin");
+      const quotes = await response.json();
+
+      quoteList.innerHTML = "";
+      quotes.forEach((quote) => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          ${quote.text} - ${quote.author} 
+          <button onclick="deleteQuote('${quote._id}')">Delete</button>`;
+        quoteList.appendChild(li);
+      });
+    }
+
+    async function deleteQuote(id) {
+      await fetch(`http://localhost:5000/admin/${id}`, { method: "DELETE" });
+      alert("Quote deleted!");
+      loadQuotes();
+    }
+
+    loadQuotes();
+  </script>
+</body>
+</html>
