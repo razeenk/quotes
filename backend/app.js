@@ -94,3 +94,39 @@ app.get("/api/stats", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+const crypto = require('crypto');
+
+// Model for API keys
+const apiKeySchema = new mongoose.Schema({
+  key: { type: String, unique: true },
+  createdAt: { type: Date, default: Date.now },
+});
+const ApiKey = mongoose.model('ApiKey', apiKeySchema);
+
+// Route to generate API key
+app.post('/api/generate-key', async (req, res) => {
+  try {
+    // Generate a unique API key
+    const apiKey = crypto.randomBytes(16).toString('hex');
+
+    // Save the key to the database
+    const newKey = new ApiKey({ key: apiKey });
+    await newKey.save();
+
+    res.status(201).json({ success: true, key: apiKey });
+  } catch (error) {
+    console.error('Error generating API key:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to generate API key' });
+  }
+});
+
+// Route to get all API keys
+app.get('/api/keys', async (req, res) => {
+  try {
+    const keys = await ApiKey.find().sort({ createdAt: -1 });
+    res.json({ success: true, keys });
+  } catch (error) {
+    console.error('Error fetching API keys:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch API keys' });
+  }
+});
