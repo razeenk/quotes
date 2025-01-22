@@ -1,154 +1,68 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
 app.use(bodyParser.json());
+app.use(cors());
 
-// MongoDB connection
+// MongoDB Connection
 mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("Failed to connect to MongoDB:", err));
+  .connect('mongodb+srv://razeem:Razeen9645@cluster0.lvtwo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0', { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch((err) => console.error('MongoDB connection error:', err));
 
-// Quote schema
-const quoteSchema = new mongoose.Schema({
-  text: { type: String, required: true, unique: true },
+// Models
+const QuoteSchema = new mongoose.Schema({
+  text: { type: String, unique: true, required: true },
   author: { type: String, required: true },
-  authorLink: { type: String },
+  authorLink: String,
 });
 
-const Quote = mongoose.model("Quote", quoteSchema);
-
-// API routes
-// 1. Fetch all quotes
-app.get("/api/quotes", async (req, res) => {
-  try {
-    const quotes = await Quote.find();
-    res.json(quotes);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch quotes" });
-  }
-});
-
-// 2. Fetch a random quote
-app.get("/api/quotes/random", async (req, res) => {
-  try {
-    const count = await Quote.countDocuments();
-    const randomIndex = Math.floor(Math.random() * count);
-    const randomQuote = await Quote.findOne().skip(randomIndex);
-    res.json(randomQuote);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch random quote" });
-  }
-});
-
-// 3. Add a new quote (prevent duplicates)
-app.post("/api/quotes", async (req, res) => {
-  try {
-    const { text, author, authorLink } = req.body;
-
-    // Check for duplicate quotes
-    const existingQuote = await Quote.findOne({ text });
-    if (existingQuote) {
-      return res.status(400).json({ error: "Duplicate quote. This quote already exists." });
-    }
-
-    const newQuote = new Quote({ text, author, authorLink });
-    await newQuote.save();
-    res.status(201).json({ message: "Quote added successfully", quote: newQuote });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to add quote" });
-  }
-});
-
-// 4. Delete a quote by ID
-app.delete("/api/quotes/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    await Quote.findByIdAndDelete(id);
-    res.status(200).json({ message: "Quote deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to delete quote" });
-  }
-});
-
-// 5. Fetch stats for total quotes and unique authors
-app.get("/api/stats", async (req, res) => {
-  try {
-    const totalQuotes = await Quote.countDocuments();
-    const uniqueAuthors = await Quote.distinct("author");
-    res.json({ totalQuotes, uniqueAuthors: uniqueAuthors.length });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch stats" });
-  }
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
-const crypto = require('crypto');
-
-// Model for API keys
-const apiKeySchema = new mongoose.Schema({
-  key: { type: String, unique: true },
+const ApiKeySchema = new mongoose.Schema({
+  key: { type: String, unique: true, required: true },
   createdAt: { type: Date, default: Date.now },
 });
-const ApiKey = mongoose.model('ApiKey', apiKeySchema);
 
-// Route to generate API key
-app.post('/api/generate-key', async (req, res) => {
-  try {
-    // Generate a unique API key
-    const apiKey = crypto.randomBytes(16).toString('hex');
-
-    // Save the key to the database
-    const newKey = new ApiKey({ key: apiKey });
-    await newKey.save();
-
-    res.status(201).json({ success: true, key: apiKey });
-  } catch (error) {
-    console.error('Error generating API key:', error.message);
-    res.status(500).json({ success: false, error: 'Failed to generate API key' });
-  }
-});
-
-// Route to get all API keys
-app.get('/api/keys', async (req, res) => {
-  try {
-    const keys = await ApiKey.find().sort({ createdAt: -1 });
-    res.json({ success: true, keys });
-  } catch (error) {
-    console.error('Error fetching API keys:', error.message);
-    res.status(500).json({ success: false, error: 'Failed to fetch API keys' });
-  }
-});
-// Import necessary modules
-const mongoose = require('mongoose');
-
-// Define API usage schema and model
-const apiUsageSchema = new mongoose.Schema({
+const ApiUsageSchema = new mongoose.Schema({
   key: { type: String, required: true },
   endpoint: { type: String, required: true },
   method: { type: String, required: true },
   count: { type: Number, default: 1 },
 });
 
-const ApiUsage = mongoose.model('ApiUsage', apiUsageSchema);
+const Quote = mongoose.model('Quote', QuoteSchema);
+const ApiKey = mongoose.model('ApiKey', ApiKeySchema);
+const ApiUsage = mongoose.model('ApiUsage', ApiUsageSchema);
 
-// Middleware to track API usage
+// Utility: Generate random API key
+const generateRandomApiKey = () => {
+  return [...Array(32)]
+    .map(() => (Math.random() * 36).toString(36).charAt(2))
+    .join('');
+};
+
+// Middleware: Authenticate API key
+const authenticateApiKey = async (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey) return res.status(401).json({ error: 'API key required' });
+
+  const keyExists = await ApiKey.findOne({ key: apiKey });
+  if (!keyExists) return res.status(403).json({ error: 'Invalid API key' });
+
+  next();
+};
+
+// Middleware: Track API usage
 const trackApiUsage = async (req, res, next) => {
   try {
     const apiKey = req.headers['x-api-key'];
     if (apiKey) {
-      const usage = await ApiUsage.findOneAndUpdate(
+      await ApiUsage.findOneAndUpdate(
         { key: apiKey, endpoint: req.path, method: req.method },
         { $inc: { count: 1 } },
         { new: true, upsert: true }
@@ -157,14 +71,57 @@ const trackApiUsage = async (req, res, next) => {
     next();
   } catch (error) {
     console.error('Error tracking API usage:', error.message);
-    next(); // Do not block the request even if tracking fails
+    next();
   }
 };
 
-// Apply the usage tracker to all `/api/quotes` routes
-app.use('/api/quotes', trackApiUsage);
+// Routes
 
-// Route to retrieve API usage stats
+// Health check
+app.get('/api/health', (req, res) => res.status(200).send('API is up and running'));
+
+// Generate API key
+app.post('/api/generate-key', async (req, res) => {
+  try {
+    const newKey = generateRandomApiKey();
+    const apiKey = new ApiKey({ key: newKey });
+    await apiKey.save();
+    res.status(201).json({ success: true, key: newKey });
+  } catch (error) {
+    console.error('Error generating API key:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to generate API key' });
+  }
+});
+
+// Get all API keys
+app.get('/api/keys', async (req, res) => {
+  try {
+    const keys = await ApiKey.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, keys });
+  } catch (error) {
+    console.error('Error fetching API keys:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch API keys' });
+  }
+});
+
+// Delete API key
+app.delete('/api/delete-key/:id', async (req, res) => {
+  try {
+    const keyId = req.params.id;
+    const deletedKey = await ApiKey.findByIdAndDelete(keyId);
+
+    if (!deletedKey) {
+      return res.status(404).json({ success: false, error: 'API key not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'API key deleted' });
+  } catch (error) {
+    console.error('Error deleting API key:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to delete API key' });
+  }
+});
+
+// Get API usage stats
 app.get('/api/usage', async (req, res) => {
   try {
     const usageStats = await ApiUsage.find({});
@@ -174,7 +131,56 @@ app.get('/api/usage', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch API usage stats' });
   }
 });
-// Health check route
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
+
+// Add a quote
+app.post('/api/quotes', authenticateApiKey, async (req, res) => {
+  try {
+    const { text, author, authorLink } = req.body;
+
+    const newQuote = new Quote({ text, author, authorLink });
+    await newQuote.save();
+
+    res.status(201).json({ success: true, message: 'Quote added', quote: newQuote });
+  } catch (error) {
+    console.error('Error adding quote:', error.message);
+
+    if (error.code === 11000) {
+      res.status(400).json({ success: false, error: 'Duplicate quote' });
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to add quote' });
+    }
+  }
 });
+
+// Get a random quote
+app.get('/api/quotes/random', authenticateApiKey, async (req, res) => {
+  try {
+    const quotes = await Quote.aggregate([{ $sample: { size: 1 } }]);
+    if (quotes.length === 0) return res.status(404).json({ error: 'No quotes available' });
+
+    res.status(200).json({ success: true, quote: quotes[0] });
+  } catch (error) {
+    console.error('Error fetching random quote:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch random quote' });
+  }
+});
+
+// Delete a quote
+app.delete('/api/quotes/:id', authenticateApiKey, async (req, res) => {
+  try {
+    const quoteId = req.params.id;
+    const deletedQuote = await Quote.findByIdAndDelete(quoteId);
+
+    if (!deletedQuote) {
+      return res.status(404).json({ success: false, error: 'Quote not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'Quote deleted' });
+  } catch (error) {
+    console.error('Error deleting quote:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to delete quote' });
+  }
+});
+
+// Start the server
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
