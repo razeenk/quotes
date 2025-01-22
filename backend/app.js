@@ -130,3 +130,51 @@ app.get('/api/keys', async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch API keys' });
   }
 });
+// Import necessary modules
+const mongoose = require('mongoose');
+
+// Define API usage schema and model
+const apiUsageSchema = new mongoose.Schema({
+  key: { type: String, required: true },
+  endpoint: { type: String, required: true },
+  method: { type: String, required: true },
+  count: { type: Number, default: 1 },
+});
+
+const ApiUsage = mongoose.model('ApiUsage', apiUsageSchema);
+
+// Middleware to track API usage
+const trackApiUsage = async (req, res, next) => {
+  try {
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey) {
+      const usage = await ApiUsage.findOneAndUpdate(
+        { key: apiKey, endpoint: req.path, method: req.method },
+        { $inc: { count: 1 } },
+        { new: true, upsert: true }
+      );
+    }
+    next();
+  } catch (error) {
+    console.error('Error tracking API usage:', error.message);
+    next(); // Do not block the request even if tracking fails
+  }
+};
+
+// Apply the usage tracker to all `/api/quotes` routes
+app.use('/api/quotes', trackApiUsage);
+
+// Route to retrieve API usage stats
+app.get('/api/usage', async (req, res) => {
+  try {
+    const usageStats = await ApiUsage.find({});
+    res.status(200).json({ success: true, data: usageStats });
+  } catch (error) {
+    console.error('Error fetching API usage stats:', error.message);
+    res.status(500).json({ success: false, error: 'Failed to fetch API usage stats' });
+  }
+});
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
