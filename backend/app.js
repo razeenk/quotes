@@ -182,5 +182,15 @@ app.delete('/api/quotes/:id', authenticateApiKey, async (req, res) => {
   }
 });
 
+//api access through url
+// Middleware to check API key from query params or headers
+app.use((req, res, next) => {
+  const apiKey = req.query.apiKey || req.header('x-api-key');
+  if (!apiKey || apiKey !== 'your-predefined-api-key') {
+    return res.status(403).json({ error: 'Invalid or missing API key' });
+  }
+  next();
+});
+
 // Start the server
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
